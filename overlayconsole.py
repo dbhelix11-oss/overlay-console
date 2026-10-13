@@ -68,6 +68,8 @@ class App:
         self.root.after(POLL_MS, self.poll)
 
     def quit(self):
+        if self.memory.helper:
+            self.memory.helper.close()
         for r in self.readers:
             r.stop()
         self.layout.save()
