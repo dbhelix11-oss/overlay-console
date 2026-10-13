@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-10-12 (docs)
+- Added `USERGUIDE.html`: self-contained user's guide covering pipes, seen/new text, memory survey, root helper, I/O capture, config, troubleshooting, glossary.
+
 ## 2026-10-12 (step 4)
 - I/O tab in the Memory window. Stage A: per-second deltas of interrupt / disk / network counters (`memsurvey/iocapture.py`), optionally mirrored to a pipe window.
 - Stage B (root): mmiotrace via helper ops `mmio_start/poll/stop` (writes only tracefs `current_tracer`/`tracing_on`, always restores `nop`, refuses if another tracer is active); trace lines decoded and annotated with the owning PCI device/BAR.

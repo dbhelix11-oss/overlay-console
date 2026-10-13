@@ -1,0 +1,363 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>OverlayConsole User's Guide</title>
+<style>
+  :root {
+    --bg: #ffffff; --fg: #1d242b; --muted: #5b6672; --line: #d9dee3;
+    --code-bg: #f1f4f7; --accent: #0b7a3b; --warn-bg: #fff4e0; --warn-line: #e0a030;
+    --note-bg: #e9f3fb; --note-line: #4a90c8;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101418; --fg: #d6dde4; --muted: #8b97a3; --line: #2a3440;
+      --code-bg: #1a2129; --accent: #7cfc9a; --warn-bg: #2b2414; --warn-line: #b8892b;
+      --note-bg: #14232f; --note-line: #3a7bad;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--fg);
+         font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 2rem; margin: 0 0 4px; }
+  h2 { margin-top: 2.4rem; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+  h3 { margin-top: 1.6rem; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  code, pre { font-family: "DejaVu Sans Mono", ui-monospace, monospace; font-size: .9em; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  pre { background: var(--code-bg); padding: 12px 14px; border-radius: 6px; overflow-x: auto;
+        border: 1px solid var(--line); }
+  pre code { background: none; padding: 0; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0; display: block; overflow-x: auto; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+  .note, .warn { padding: 10px 14px; border-radius: 6px; border-left: 4px solid; margin: 14px 0; }
+  .note { background: var(--note-bg); border-color: var(--note-line); }
+  .warn { background: var(--warn-bg); border-color: var(--warn-line); }
+  nav { background: var(--code-bg); border: 1px solid var(--line); border-radius: 6px;
+        padding: 10px 18px; margin-bottom: 8px; }
+  nav ol { margin: 4px 0; padding-left: 20px; columns: 2; }
+  a { color: var(--accent); }
+  .new { color: var(--accent); font-family: monospace; }
+  .old { color: var(--muted); font-family: monospace; }
+  dt { font-weight: 600; margin-top: 10px; }
+  dd { margin-left: 18px; color: var(--fg); }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>OverlayConsole</h1>
+<p class="sub">User's guide &middot; a multi-window pipe viewer with a built-in Linux memory and hardware survey</p>
+
+<nav>
+<strong>Contents</strong>
+<ol>
+  <li><a href="#what">What it is</a></li>
+  <li><a href="#start">Starting it</a></li>
+  <li><a href="#windows">The windows</a></li>
+  <li><a href="#pipes">Sending data into a window</a></li>
+  <li><a href="#seen">Seen vs. new text</a></li>
+  <li><a href="#persist">What is remembered</a></li>
+  <li><a href="#memory">Memory survey</a></li>
+  <li><a href="#root">Elevating to root</a></li>
+  <li><a href="#io">I/O capture</a></li>
+  <li><a href="#config">Configuration and files</a></li>
+  <li><a href="#trouble">Troubleshooting</a></li>
+  <li><a href="#safety">Safety notes</a></li>
+  <li><a href="#glossary">Glossary</a></li>
+</ol>
+</nav>
+
+<h2 id="what">1. What it is</h2>
+<p>OverlayConsole is a blank desktop GUI (graphical user interface) made of several independent windows. Each
+window can show the output of any shell command: you point the command at a <em>named pipe</em> (a special file
+that passes data from one program to another) and the text appears in the matching window. The windows remember
+their size and position, so you can arrange them side by side once and keep that layout.</p>
+<p>One built-in function is included: a read-only <strong>memory survey</strong>. It maps your computer's RAM
+(random-access memory), shows what the operating system exposes about kernel, process and hardware addresses,
+what you can see as a normal user, and what needs root. It was written partly as a way to learn how memory
+addressing works on a modern Linux system.</p>
+
+<h2 id="start">2. Starting it</h2>
+<p>Requirements: Linux with a graphical session, Python 3 and its Tk library (<code>python3-tk</code> on
+Debian/Ubuntu). Nothing else needs installing.</p>
+<pre><code>cd /home/stoic/Documents/ClaudeProject/OverlayConsole
+python3 overlayconsole.py</code></pre>
+<p>Only one copy can run at a time; starting a second prints <em>"OverlayConsole is already running."</em>
+The first launch creates the <code>pipes/</code> folder with five named pipes in it.</p>
+<p>To run just the memory survey as plain text in a terminal, without the GUI:</p>
+<pre><code>python3 -m memsurvey.survey</code></pre>
+
+<h2 id="windows">3. The windows</h2>
+<h3>Control window</h3>
+<p>The small main window lists the five pipes and a <strong>Memory survey</strong> button. Click a name to show
+or hide that pipe's window. A filled circle (&#9679;) means the window is open, an empty one (&#9675;) means it
+is hidden. When a hidden or background window has unread text, its name turns green and shows
+<code>(N new)</code>. A divider bar between the list and the usage notes can be dragged.</p>
+<p><strong>Closing the control window quits the program</strong> and closes the other windows. Closing a pipe
+window or the Memory window only hides it.</p>
+
+<h3>Pipe windows</h3>
+<p>One window per pipe, named for the pipe (<code>alpha</code>, <code>bravo</code>, <code>charlie</code>,
+<code>delta</code>, <code>echo</code>). Each has:</p>
+<ul>
+  <li>a status line (<code>pipes/alpha &nbsp; 3 new</code> or <code>all seen</code>),</li>
+  <li><strong>mark seen</strong> &ndash; turn all bright text grey (see <a href="#seen">section 5</a>),</li>
+  <li><strong>clear</strong> &ndash; empty the window,</li>
+  <li>vertical and horizontal scrollbars (long lines are not wrapped). The window follows new output only when
+      you are scrolled to the bottom, so you can scroll up and read without being yanked down.</li>
+</ul>
+<p>Each window keeps its most recent 20,000 lines; older lines are dropped.</p>
+
+<h2 id="pipes">4. Sending data into a window</h2>
+<p>The pipes are ordinary Linux named pipes (made with <code>mkfifo</code>). Anything that can write to a file
+can feed a window &mdash; no special tool is required.</p>
+<pre><code>echo "hello" &gt; pipes/alpha
+ping -c 5 localhost &gt; pipes/bravo
+dmesg | tee pipes/charlie            # tee also shows it in your terminal
+tail -f /var/log/syslog &gt;&gt; pipes/delta
+journalctl -f &gt; pipes/echo
+cat notes.txt &gt; pipes/alpha</code></pre>
+<p>Use the full path (or run from the project folder as above). Each line you write becomes one line in the
+window; text is decoded as UTF-8 and unprintable bytes are replaced.</p>
+<div class="warn"><strong>The console must be running.</strong> A named pipe with nobody reading it makes the
+writer <em>wait</em> (block) until a reader appears. If you run <code>echo hi &gt; pipes/alpha</code> while
+OverlayConsole is closed, your terminal will appear to hang until you start OverlayConsole (or press
+Ctrl-C). Saving the output to log files when the console is closed is planned but not built yet.</div>
+
+<h2 id="seen">5. Seen vs. new text</h2>
+<p>New text is drawn in <span class="new">bright green</span>. Text you have already seen is
+<span class="old">dim grey</span>. A yellow <code>&#9472;&#9472;&#9472; new &#9472;&#9472;&#9472;</code> line marks
+where the unread block begins.</p>
+<p>Text becomes "seen" when you press <strong>mark seen</strong> in that window, or when keyboard focus leaves
+OverlayConsole entirely (you click on another application). Moving between OverlayConsole's own windows does
+not mark text as seen. After that, the next line to arrive starts a fresh <code>new</code> block below the grey
+text.</p>
+<p>Seen/new status lasts only while the program is running; it is not yet saved between sessions.</p>
+
+<h2 id="persist">6. What is remembered</h2>
+<p>The file <code>state.json</code> stores, for every window: its size and screen position, whether it is
+shown or hidden, the divider position of the control window (as a proportion, so it scales if you resize),
+and which Memory-survey tab was last open. It is saved shortly after any change and on exit. If a saved window
+would fall off a smaller screen, it is moved back on. Deleting <code>state.json</code> resets all layout to
+defaults.</p>
+
+<h2 id="memory">7. Memory survey</h2>
+<p>Click <strong>Memory survey</strong> in the control window. Everything on these tabs is read-only: the
+program reads information the kernel publishes under <code>/proc</code> and <code>/sys</code> and never
+writes to memory or devices (the single exception, the MMIO trace, is described in
+<a href="#io">section 9</a>).</p>
+
+<p><strong>Toolbar.</strong> <em>refresh</em> re-reads the current tab. <em>Elevate (root)&hellip;</em> is
+explained in <a href="#root">section 8</a>; next to it is the current mode (<em>user</em> or <em>ROOT
+helper</em>). <em>send tab to pipe</em> copies the whole current tab into the pipe window you choose, so a
+survey can sit beside other output. Tabs load the first time you open them and are not updated automatically;
+press <em>refresh</em> to update.</p>
+
+<h3>Summary</h3>
+<p>Memory totals from <code>/proc/meminfo</code> (total, free, available, cache, kernel data, huge pages...),
+the page size (the smallest unit the kernel hands out, 4096 bytes) and the memory-hotplug block size. Below it
+is a table of <strong>what this user can see</strong>: for each address-bearing source, whether it is
+<code>ok</code>, <code>masked</code> (readable, but addresses replaced with zeros) or <code>denied</code>.
+This table is the quickest way to see what root unlocks.</p>
+
+<h3>Physical</h3>
+<p>The map of <em>physical</em> addresses &mdash; where things really sit on the memory bus.</p>
+<ul>
+  <li><strong>Firmware memory map</strong> (e820 table from the BIOS/UEFI): ranges of RAM, reserved areas and
+      ACPI tables with real addresses, readable without root. Notice the gap just below 4 GiB: RAM jumps
+      over a region used by device registers, then continues above 4 GiB.</li>
+  <li><strong>Kernel resource tree</strong> (<code>/proc/iomem</code>): the nested list of who owns each range
+      (RAM, PCI devices, drivers). Addresses show as zero unless root, but the names and nesting remain.</li>
+  <li><strong>Memory blocks</strong> and the <strong>zone free lists</strong> (<code>/proc/buddyinfo</code>):
+      how much free memory exists in each region (DMA below 16 MiB, DMA32 below 4 GiB, Normal above) and in
+      blocks of what size.</li>
+</ul>
+
+<h3>Kernel</h3>
+<p>Counts of kernel symbols by type (code, data, etc.), the largest loaded modules, and a reference table of
+the x86-64 kernel virtual address layout (user space, the direct map of all RAM, the vmalloc area, the
+<code>struct page</code> array, kernel code and modules). Symbol and module addresses are zeroed without
+root. The layout table is a fixed reference; the real bases are shifted at boot by KASLR (kernel address space
+layout randomisation).</p>
+
+<h3>Processes</h3>
+<p>Walks every process you are allowed to inspect and groups its virtual address space by category: heap,
+stack, shared libraries, program files, anonymous memory, shared memory, special kernel pages
+(vdso/vvar), and named allocator regions. It also totals by permission (read/write/execute) and ranks the top 20
+processes by PSS (proportional set size: RAM actually used, with shared pages divided among sharers). Large
+"virtual" numbers against small RAM numbers are normal &mdash; most reserved address space is never touched.</p>
+<p><strong>Inspect PID:</strong> type a process ID and press Enter (or <em>show map</em>) to list that process's
+address ranges with permissions, size, category and mapped file. <em>back to overview</em> returns to the
+summary. Other users' processes are denied unless elevated.</p>
+
+<h3>Hardware</h3>
+<p>PCI devices with their vendor:device ID, class, bound driver and the address ranges (BARs, base address
+registers) where their registers live; legacy I/O port ranges; and the busiest interrupt lines. Device
+registers are shown as physical addresses, which you can match to the "reserved" holes on the Physical
+tab.</p>
+
+<h2 id="root">8. Elevating to root</h2>
+<p>The GUI always runs as your normal user. When you click <strong>Elevate (root)&hellip;</strong> the system's
+standard authentication dialog (polkit, via <code>pkexec</code>) asks for your password. On success a small
+helper program starts as root and the label turns orange: <strong>ROOT helper (uid 0)</strong>. Your password
+is handled by the system dialog; OverlayConsole never sees or stores it. If you cancel, you simply stay in
+user mode and the status line says so.</p>
+<p>While elevated, every tab is re-read as root, so zeroed addresses in <code>/proc/iomem</code>,
+<code>/proc/ioports</code>, kernel symbols, module load addresses and PCI maps show real values, and the
+Processes tab can see all users' processes. Click <strong>Drop root</strong> to end the helper and return to
+user mode.</p>
+
+<h3>The Privileged tab</h3>
+<p>Available only while elevated. Numbers can be decimal or hexadecimal (<code>0x...</code>).</p>
+<table>
+<tr><th>Tool</th><th>What it does</th></tr>
+<tr><td>kernel virtual map</td><td>Reads <code>/proc/kcore</code> and lists every mapped kernel virtual range
+    with its size and region (direct map of RAM, vmalloc, vmemmap, kernel text, modules).</td></tr>
+<tr><td>vmallocinfo</td><td>Kernel allocations in the vmalloc area (first 400 lines).</td></tr>
+<tr><td>kallsyms match / find</td><td>Search kernel symbols by name (e.g. <code>printk</code>) with real
+    addresses. Empty search shows the first 50.</td></tr>
+<tr><td>hexdump process memory</td><td>Fields: <em>PID</em>, <em>virtual addr</em>, <em>bytes</em> (max 4096).
+    Prints address, hex bytes and ASCII for that process. Use an address from the Inspect-PID map, otherwise the
+    read fails as unmapped. Some processes may be refused by the kernel's ptrace rules.</td></tr>
+<tr><td>virtual &rarr; physical (pagemap)</td><td>Fields: <em>PID</em>, <em>virtual addr</em>, <em>pages</em>.
+    Shows, for each 4 KiB page, the physical frame number (PFN) it lives in, the resulting physical address, and
+    flags (present, swapped, file/shared, exclusive, soft-dirty). This is the actual virtual-to-physical
+    translation the CPU performs.</td></tr>
+<tr><td>hexdump /dev/mem</td><td>Fields: <em>physical addr</em> (shares the box with virtual addr), <em>bytes</em>.
+    Reads raw physical memory. This kernel restricts <code>/dev/mem</code> (<code>STRICT_DEVMEM</code>) to
+    non-RAM ranges and the first 1 MiB, so most RAM addresses are refused by design.</td></tr>
+</table>
+<p>Errors (unmapped address, permission refused, bad number) are printed in the tab rather than crashing
+anything.</p>
+
+<h2 id="io">9. I/O capture</h2>
+<p>The <strong>I/O</strong> tab shows what hardware is doing. It has two independent modes and a
+<em>mirror to pipe</em> checkbox that also copies the output into the pipe chosen in the toolbar.</p>
+
+<h3>Counter sampling (no root needed)</h3>
+<p>Press <strong>&#9654; sample counters</strong>. Once a second the tab shows what changed: interrupts per
+second per device (timer, disk controller, graphics, network card...), disk read/write bytes per second, and
+network receive/transmit rates, with running totals since you pressed start. Press the button again
+(<strong>&#9632; stop sampling</strong>) to stop.</p>
+
+<h3>MMIO trace (root)</h3>
+<p>MMIO (memory-mapped I/O) means a device's control registers appear as addresses in the memory map; reading and
+writing those addresses is how drivers talk to hardware. The <strong>&#9654; MMIO trace</strong> button turns on
+the kernel's <code>mmiotrace</code> facility and lists each register read or write, decoded like this:</p>
+<pre><code>   3.500000 READ  4B phys=0xe0000008 value=0x00001234 [0000:00:02.0 i915 BAR2+0x8] map#1</code></pre>
+<p>Fields: timestamp, read or write, width in bytes, physical address, value, then which PCI device, driver and
+BAR (and offset into it) that address belongs to.</p>
+<ol>
+  <li>Click <em>Elevate</em> first. You will be asked to confirm starting the trace.</li>
+  <li>The trace only sees devices whose driver maps its registers <strong>after</strong> the trace begins. To
+      observe a device, reload its driver, for example the network card:
+      <pre><code>sudo modprobe -r e1000e &amp;&amp; sudo modprobe e1000e</code></pre>
+      This briefly drops that device (and your network). Use a device you can afford to interrupt.</li>
+  <li>Press <strong>&#9632; stop MMIO trace</strong>, <em>Drop root</em>, or quit to end it. All three restore the
+      kernel tracer to its normal "off" state. If another tracer is already active, OverlayConsole refuses to
+      start rather than replace it.</li>
+</ol>
+<p>Only memory-mapped registers are captured. Old-style x86 port I/O (<code>in</code>/<code>out</code>
+instructions) is not traced. Tracing slows the machine while running.</p>
+
+<h2 id="config">10. Configuration and files</h2>
+<h3>Renaming or changing the pipes</h3>
+<p>Create <code>config.json</code> in the project folder:</p>
+<pre><code>{ "pipes": ["logs", "net", "build", "debug", "misc", "extra"] }</code></pre>
+<p>Names must be unique and look like variable names (letters, digits, underscore; not starting with a digit).
+Any number of pipes is allowed, not only five. If the file is missing or invalid, the default five are used.
+Restart to apply. Old pipe files and saved layout for removed names are simply ignored.</p>
+
+<h3>Files in the project folder</h3>
+<table>
+<tr><th>Path</th><th>Purpose</th></tr>
+<tr><td><code>overlayconsole.py</code></td><td>Program entry point.</td></tr>
+<tr><td><code>occore/</code></td><td>Window, pipe-reading and layout-saving code.</td></tr>
+<tr><td><code>memsurvey/survey.py</code></td><td>The read-only memory survey (also runnable on its own).</td></tr>
+<tr><td><code>memsurvey/helper.py</code>, <code>elevate.py</code></td><td>The root helper and the code that launches it.</td></tr>
+<tr><td><code>memsurvey/iocapture.py</code></td><td>Counter sampling and MMIO-trace decoding.</td></tr>
+<tr><td><code>memsurvey/window.py</code></td><td>The Memory survey window.</td></tr>
+<tr><td><code>pipes/</code></td><td>The named pipes (created on start; not tracked in git).</td></tr>
+<tr><td><code>state.json</code></td><td>Saved window layout (not tracked in git).</td></tr>
+<tr><td><code>config.json</code></td><td>Optional settings (pipe names).</td></tr>
+<tr><td><code>CHANGELOG.md</code></td><td>History of changes.</td></tr>
+</table>
+
+<h2 id="trouble">11. Troubleshooting</h2>
+<dl>
+  <dt>My command hangs when I write to a pipe.</dt>
+  <dd>OverlayConsole is not running, so nothing is reading. Start it, or press Ctrl-C.</dd>
+  <dt>"OverlayConsole is already running."</dt>
+  <dd>A copy is already open (check for hidden windows or run <code>pgrep -af overlayconsole</code>). A stale
+      lock after a crash clears itself, because it is released when the process exits.</dd>
+  <dt>A window is missing.</dt>
+  <dd>It is hidden: click its name in the control window. If the position is off-screen, delete
+      <code>state.json</code> and restart.</dd>
+  <dt>Elevate does nothing or says <em>pkexec not found</em>.</dt>
+  <dd>Install polkit (<code>sudo apt install policykit-1</code>) and make sure a polkit authentication agent
+      is running in your desktop session.</dd>
+  <dt>"authentication cancelled or denied".</dt>
+  <dd>You closed the password dialog or typed it wrong. Press Elevate again.</dd>
+  <dt>hexdump says "Input/output error" or "Permission denied".</dt>
+  <dd>The address is not mapped in that process, or the kernel refuses (ptrace rules, or
+      <code>/dev/mem</code> limits on RAM). This is the kernel protecting memory, not a bug.</dd>
+  <dt>MMIO trace shows nothing.</dt>
+  <dd>Expected until a driver maps its registers after the trace starts; reload a driver (section 9).</dd>
+  <dt>Tabs look out of date.</dt>
+  <dd>Tabs load once. Press <em>refresh</em>.</dd>
+</dl>
+
+<h2 id="safety">12. Safety notes</h2>
+<div class="note">The survey and all root tools only <strong>read</strong>. The helper accepts a fixed list of
+commands, limits each read to 4096 bytes, and validates every argument. Its only writes are the fixed
+on/off settings of the kernel tracer used by the MMIO trace, which are always switched back.</div>
+<div class="warn">
+<ul>
+  <li>Reading another process's memory or raw physical memory can expose passwords, keys and private data on
+      screen, and via <em>mirror to pipe</em> or <em>send tab to pipe</em> into anything attached to a pipe
+      (such as a file with <code>tee</code>). Only use it on a machine you own.</li>
+  <li>The root helper file <code>memsurvey/helper.py</code> lives in your project folder and is run as root. Any
+      program running as you could modify that file before you next click Elevate. This is acceptable for a
+      personal learning tool; do not deploy it to a shared machine without installing the helper in a
+      root-owned location.</li>
+  <li>Pipes are owner-only (mode 0600), so other users cannot write to them.</li>
+  <li>Reloading drivers for the MMIO trace interrupts the device. Do not do this for your only disk
+      controller or network link.</li>
+</ul>
+</div>
+
+<h2 id="glossary">13. Glossary</h2>
+<dl>
+  <dt>Named pipe (FIFO)</dt><dd>A file-like object that one program writes into and another reads from, in order.
+    First in, first out.</dd>
+  <dt>Physical address</dt><dd>A location on the actual memory bus, as the hardware sees it.</dd>
+  <dt>Virtual address</dt><dd>The address a program sees. The CPU translates it to a physical address through
+    page tables, a block of 4096 bytes at a time.</dd>
+  <dt>Page / PFN</dt><dd>A page is one 4096-byte unit of memory. The PFN (page frame number) is a page's physical
+    position: physical address = PFN &times; 4096.</dd>
+  <dt>Kernel</dt><dd>The core of the operating system, which manages memory and hardware.</dd>
+  <dt>/proc and /sys</dt><dd>Virtual folders where the kernel publishes live information as readable files.</dd>
+  <dt>KASLR</dt><dd>Kernel address space layout randomisation: the kernel loads at a random offset each boot to
+    make attacks harder.</dd>
+  <dt>kptr_restrict</dt><dd>A kernel setting that hides kernel addresses from non-root users (shown as zeros).</dd>
+  <dt>ptrace / Yama</dt><dd>The kernel's debugging interface and the security rule (ptrace_scope) that limits
+    which processes may read each other's memory.</dd>
+  <dt>PCI / BAR</dt><dd>PCI is the bus most hardware devices sit on. A BAR (base address register) tells the system
+    where in the address map a device's registers are placed.</dd>
+  <dt>MMIO</dt><dd>Memory-mapped input/output: device registers accessed as if they were memory addresses.</dd>
+  <dt>Interrupt (IRQ)</dt><dd>A signal from hardware asking the CPU for attention, such as "a packet arrived".</dd>
+  <dt>Driver / module</dt><dd>Kernel code that operates a particular piece of hardware; a module is a driver that
+    can be loaded and unloaded.</dd>
+  <dt>polkit / pkexec</dt><dd>The standard Linux system for asking for administrator permission through a dialog
+    instead of running a whole program as root.</dd>
+  <dt>tracefs / mmiotrace</dt><dd>The kernel's tracing interface, and the tracer within it that records
+    memory-mapped register accesses.</dd>
+</dl>
+
+</div>
+</body>
+</html>
