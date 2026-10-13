@@ -196,7 +196,9 @@ text.</p>
 <p>The file <code>state.json</code> stores, for every window: its size and screen position, whether it is
 shown or hidden, the divider positions of the control window and of the docked grid (as proportions, so they scale if you resize),
 and which Memory-survey tab was last open. It is saved shortly after any change and on exit. If a saved window
-would fall off a smaller screen, it is moved back on. Deleting <code>state.json</code> resets all layout to
+would fall off a smaller screen, it is moved back on. On X11 desktops (e.g. LXQt, Xfce) each window's <em>virtual desktop</em> (workspace) is also remembered and
+restored on start, using <code>xprop</code>, <code>xwininfo</code> and <code>wmctrl</code> (optional; without them, or
+on Wayland, the windows simply open on the current desktop). Deleting <code>state.json</code> resets all layout to
 defaults.</p>
 
 <h2 id="memory">7. Memory survey</h2>

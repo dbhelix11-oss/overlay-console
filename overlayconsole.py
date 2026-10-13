@@ -48,6 +48,7 @@ class App:
         self.root.protocol("WM_DELETE_WINDOW", self.quit)
         self.refresh_buttons()
         self.root.after(POLL_MS, self.poll)
+        self.root.after(400, self.layout.restore_desktops)  # once the windows are mapped
 
     def toggle(self, name):
         w = self.windows[name]

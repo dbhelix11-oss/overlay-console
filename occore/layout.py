@@ -2,9 +2,62 @@
 import json
 import os
 import re
+import shutil
+import subprocess
 
 _GEOM = re.compile(r"^(\d+)x(\d+)([+-]-?\d+)([+-]-?\d+)$")
 SAVE_DELAY_MS = 500
+DESKTOP_POLL_MS = 2000
+STICKY = 0xFFFFFFFF  # _NET_WM_DESKTOP value meaning "on all desktops"
+_DESKTOP = re.compile(r"=\s*(\d+)")
+
+
+_PARENT = re.compile(r"Parent window id:\s*(0x[0-9a-fA-F]+)")
+
+
+def _client_id(win):
+    """X id of the window the window manager manages. Tk wraps each toplevel in a
+    wrapper window, which is the parent of the id winfo_id() reports."""
+    own = hex(win.winfo_id())
+    if not shutil.which("xwininfo"):
+        return own
+    try:
+        out = subprocess.run(["xwininfo", "-id", own, "-tree"], capture_output=True,
+                             text=True, timeout=2).stdout
+    except (OSError, subprocess.SubprocessError):
+        return own
+    m = _PARENT.search(out)
+    return m[1] if m else own
+
+
+def _shown(win):
+    """Shown (even if on another desktop, where X reports it unmapped) rather than withdrawn."""
+    return win.state() != "withdrawn"
+
+
+def get_desktop(win):
+    """Virtual desktop a mapped window is on (X11 only), or None if unknown."""
+    if not shutil.which("xprop"):
+        return None
+    try:
+        out = subprocess.run(["xprop", "-id", _client_id(win), "_NET_WM_DESKTOP"],
+                             capture_output=True, text=True, timeout=2).stdout
+    except (OSError, subprocess.SubprocessError):
+        return None
+    m = _DESKTOP.search(out)
+    return int(m[1]) if m else None
+
+
+def set_desktop(win, desktop):
+    """Ask the window manager to move a mapped window to a virtual desktop (X11, needs wmctrl)."""
+    if not shutil.which("wmctrl"):
+        return
+    wid = _client_id(win)
+    args = (["-b", "add,sticky"] if desktop == STICKY else ["-t", str(desktop)])
+    try:
+        subprocess.run(["wmctrl", "-i", "-r", wid, *args], capture_output=True, timeout=2)
+    except (OSError, subprocess.SubprocessError):
+        pass
 
 
 def clamp_geometry(geom, screen_w, screen_h):
@@ -32,6 +85,8 @@ class Layout:
         except (OSError, ValueError):
             self.data = {}
         self.data.setdefault("windows", {})
+        self._wins = {}
+        self.root.after(DESKTOP_POLL_MS, self._poll_desktops)
 
     def entry(self, key):
         return self.data["windows"].setdefault(key, {})
@@ -42,6 +97,7 @@ class Layout:
         geom = clamp_geometry(e.get("geometry"), win.winfo_screenwidth(),
                               win.winfo_screenheight())
         win.geometry(geom or default_geometry)
+        self._wins[key] = win
         win.bind("<Configure>", lambda ev: self._on_configure(key, win, ev), add="+")
         return e.get("visible", default_visible)
 
@@ -54,6 +110,36 @@ class Layout:
     def set_visible(self, key, visible):
         self.entry(key)["visible"] = visible
         self.schedule_save()
+        if visible and key in self._wins:
+            win = self._wins[key]
+            win.after(200, lambda: self._restore_one(key, win))
+
+    # -- virtual desktop memory (X11 only; silently does nothing elsewhere)
+    def _restore_one(self, key, win):
+        d = self.entry(key).get("desktop")
+        if isinstance(d, int) and _shown(win):
+            set_desktop(win, d)
+
+    def restore_desktops(self):
+        """Move every shown window to the desktop it was last on. Call once windows are mapped."""
+        for key, win in self._wins.items():
+            self._restore_one(key, win)
+
+    def _record_desktops(self):
+        changed = False
+        for key, win in self._wins.items():
+            if not _shown(win):
+                continue
+            d = get_desktop(win)
+            if d is not None and self.entry(key).get("desktop") != d:
+                self.entry(key)["desktop"] = d
+                changed = True
+        return changed
+
+    def _poll_desktops(self):
+        if self._record_desktops():
+            self.schedule_save()
+        self.root.after(DESKTOP_POLL_MS, self._poll_desktops)
 
     def track_paned(self, key, paned, default_ratios):
         """Store sash positions as fractions of the pane size so they survive resizes."""
@@ -98,6 +184,7 @@ class Layout:
 
     def save(self):
         self._after = None
+        self._record_desktops()
         tmp = self.path.with_suffix(".tmp")
         try:
             tmp.write_text(json.dumps(self.data, indent=2, sort_keys=True))
