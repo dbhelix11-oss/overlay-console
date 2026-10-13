@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-10-13
+- User guide: documented the docked grid and `setup-access.sh`. Commits now use the GitHub noreply address.
 - First four pipes (alpha..delta) now snap into one resizable 2x2 grid window (`occore/dock.py`); column dividers move together, row/column ratios saved in `state.json`. Further pipes stay floating windows.
 - Added `setup-access.sh`: menu to make the pipes reachable from anywhere (~/oc symlink, $OC variable, per-pipe shell functions, per-directory symlinks, SSH / socat instructions); can reload ~/.bashrc when sourced.
 

@@ -100,9 +100,20 @@ is hidden. When a hidden or background window has unread text, its name turns gr
 <p><strong>Closing the control window quits the program</strong> and closes the other windows. Closing a pipe
 window or the Memory window only hides it.</p>
 
+<h3>The docked grid (first four pipes)</h3>
+<p>The first four pipes (<code>alpha</code>, <code>bravo</code> on top; <code>charlie</code>,
+<code>delta</code> below) are snapped together in <strong>one window</strong> as a 2&times;2 grid. Drag the
+horizontal divider to change the row heights. Drag the vertical divider in either row to change the column
+widths; the divider in the other row moves with it, so the grid stays aligned like a table. Resize the window
+and the proportions are kept. The divider positions are saved (as proportions) in <code>state.json</code>.</p>
+<p>Because the four are one window, clicking any of their names in the control window shows or hides the whole
+grid. New text in the grid is marked as seen when the grid window loses keyboard focus (all four panes together);
+each pane still has its own <strong>mark seen</strong> and <strong>clear</strong> buttons. Any pipes beyond the
+first four (by default <code>echo</code>) stay as separate floating windows.</p>
+
 <h3>Pipe windows</h3>
-<p>One window per pipe, named for the pipe (<code>alpha</code>, <code>bravo</code>, <code>charlie</code>,
-<code>delta</code>, <code>echo</code>). Each has:</p>
+<p>One view per pipe, named for the pipe (<code>alpha</code>, <code>bravo</code>, <code>charlie</code>,
+<code>delta</code>, <code>echo</code>), either a pane in the grid or a floating window. Each has:</p>
 <ul>
   <li>a status line (<code>pipes/alpha &nbsp; 3 new</code> or <code>all seen</code>),</li>
   <li><strong>mark seen</strong> &ndash; turn all bright text grey (see <a href="#seen">section 5</a>),</li>
@@ -128,6 +139,28 @@ writer <em>wait</em> (block) until a reader appears. If you run <code>echo hi &g
 OverlayConsole is closed, your terminal will appear to hang until you start OverlayConsole (or press
 Ctrl-C). Saving the output to log files when the console is closed is planned but not built yet.</div>
 
+<h3>Reaching the pipes from anywhere</h3>
+<p>A shell treats <code>&gt; alpha</code> as a file called <code>alpha</code> in the current directory, so the
+bare name cannot be looked up automatically. Several plain-shell shortcuts get close, and the script
+<code>setup-access.sh</code> in the project folder offers them as a menu:</p>
+<pre><code>./setup-access.sh            # choose by number, e.g.  1 2 3   (asks before changing anything)
+source ./setup-access.sh     # same, and reloads ~/.bashrc in your current shell afterwards</code></pre>
+<table>
+<tr><th>#</th><th>Option</th><th>Then you can write</th></tr>
+<tr><td>1</td><td>Symlink <code>~/oc</code> to the pipes folder</td><td><code>make 2&gt;&amp;1 | tee ~/oc/alpha</code></td></tr>
+<tr><td>2</td><td>Variable <code>$OC</code> in <code>~/.bashrc</code></td><td><code>make &gt; $OC/alpha 2&gt;&amp;1</code></td></tr>
+<tr><td>3</td><td>One shell function per pipe name in <code>~/.bashrc</code> (names that are already commands, such as <code>echo</code>, are skipped)</td><td><code>make 2&gt;&amp;1 | alpha</code></td></tr>
+<tr><td>4</td><td>Symlinks to the pipes in a directory you choose</td><td><code>make &gt; alpha 2&gt;&amp;1</code> (in that directory)</td></tr>
+<tr><td>5</td><td>Remote over SSH (instructions only)</td><td><code>cmd | ssh you@host 'cat &gt; ~/oc/alpha'</code></td></tr>
+<tr><td>6</td><td>Remote via a <code>socat</code> listener plus SSH tunnel (instructions only)</td><td>see the script's output</td></tr>
+</table>
+<p>Options 2 and 3 write a marked block into <code>~/.bashrc</code>; running the script again replaces that block
+rather than duplicating it. A script cannot change the shell that launched it, so run it with
+<code>source</code> to have <code>~/.bashrc</code> reloaded for you, or accept the offer to open a fresh shell.
+Note that <code>cmd &gt; pipe 2&gt;&amp;1</code> sends errors too, while <code>cmd 2&gt;&amp;1 &gt; pipe</code> does not
+(the order matters). Remote options need your own SSH access; the script never reads <code>~/.ssh</code>, and a
+<code>socat</code> listener has no authentication, so keep it bound to <code>127.0.0.1</code>.</p>
+
 <h2 id="seen">5. Seen vs. new text</h2>
 <p>New text is drawn in <span class="new">bright green</span>. Text you have already seen is
 <span class="old">dim grey</span>. A yellow <code>&#9472;&#9472;&#9472; new &#9472;&#9472;&#9472;</code> line marks
@@ -140,7 +173,7 @@ text.</p>
 
 <h2 id="persist">6. What is remembered</h2>
 <p>The file <code>state.json</code> stores, for every window: its size and screen position, whether it is
-shown or hidden, the divider position of the control window (as a proportion, so it scales if you resize),
+shown or hidden, the divider positions of the control window and of the docked grid (as proportions, so they scale if you resize),
 and which Memory-survey tab was last open. It is saved shortly after any change and on exit. If a saved window
 would fall off a smaller screen, it is moved back on. Deleting <code>state.json</code> resets all layout to
 defaults.</p>
@@ -276,7 +309,8 @@ Restart to apply. Old pipe files and saved layout for removed names are simply i
 <table>
 <tr><th>Path</th><th>Purpose</th></tr>
 <tr><td><code>overlayconsole.py</code></td><td>Program entry point.</td></tr>
-<tr><td><code>occore/</code></td><td>Window, pipe-reading and layout-saving code.</td></tr>
+<tr><td><code>occore/</code></td><td>Window, pipe-reading and layout-saving code (<code>dock.py</code> is the 2&times;2 grid).</td></tr>
+<tr><td><code>setup-access.sh</code></td><td>Menu for reaching the pipes from anywhere (section 4).</td></tr>
 <tr><td><code>memsurvey/survey.py</code></td><td>The read-only memory survey (also runnable on its own).</td></tr>
 <tr><td><code>memsurvey/helper.py</code>, <code>elevate.py</code></td><td>The root helper and the code that launches it.</td></tr>
 <tr><td><code>memsurvey/iocapture.py</code></td><td>Counter sampling and MMIO-trace decoding.</td></tr>
