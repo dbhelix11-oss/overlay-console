@@ -5,7 +5,7 @@ import tkinter as tk
 from tkinter import ttk
 
 from occore.windows import BG, NEW_FG, SEEN_FG
-from . import survey
+from . import iocapture, survey
 from .elevate import ElevateError, HelperClient
 
 TEXT_FG = "#c8d0d8"
@@ -23,6 +23,7 @@ class MemoryWindow:
         self.texts = {}
         self.busy = set()
         self.results = queue.Queue()
+        self.mmio_results = queue.Queue()
         self.elev_results = queue.Queue()
         self.helper = None
         self.elevating = False
@@ -45,10 +46,12 @@ class MemoryWindow:
 
         self.nb = ttk.Notebook(self.top)
         self.nb.pack(fill="both", expand=True)
-        for name in [n for n, _ in survey.SECTIONS] + ["Privileged"]:
+        for name in [n for n, _ in survey.SECTIONS] + ["Privileged", "I/O"]:
             frame = tk.Frame(self.nb, bg=BG)
             if name == "Privileged":
                 self._build_privileged_controls(frame)
+            elif name == "I/O":
+                self._build_io_controls(frame)
             if name == "Processes":
                 row = tk.Frame(frame, bg=BG)
                 row.pack(fill="x")
@@ -111,6 +114,8 @@ class MemoryWindow:
         self.top.after(50, self._drain)
 
     def _section_fn(self, name):
+        if name == "I/O":
+            return lambda: ["Use the buttons above."]
         if name == "Privileged":
             return lambda: ["Press Elevate (root)… to enable the tools above."] \
                 if not self.helper else ["Choose a tool above."]
@@ -188,6 +193,8 @@ class MemoryWindow:
         self.elev_btn.configure(state="normal")
 
     def drop_helper(self, why=""):
+        if self.mmio_on:
+            self.toggle_mmio()
         if self.helper:
             self.helper.close()
             self.helper = None
@@ -237,6 +244,126 @@ class MemoryWindow:
                   command=lambda: self.priv("read_phys", addr=self.pv["addr"].get(),
                                             length=self.pv["length"].get()),
                   **BTN).pack(side="left", padx=4)
+
+    # --------------------------------------------------------------- I/O tab
+    def _build_io_controls(self, frame):
+        self.sampler = None
+        self.mmio_on = False
+        self.mirror = tk.BooleanVar(value=False)
+        self.mmio_lines = []
+        self.ranges = []
+        r = tk.Frame(frame, bg=BG)
+        r.pack(fill="x", pady=2)
+        self.sample_btn = tk.Button(r, text="▶ sample counters (irq / disk / net)",
+                                    command=self.toggle_sampling, **BTN)
+        self.sample_btn.pack(side="left", padx=4)
+        self.mmio_btn = tk.Button(r, text="▶ MMIO trace (root)", command=self.toggle_mmio, **BTN)
+        self.mmio_btn.pack(side="left", padx=4)
+        tk.Checkbutton(r, text="mirror to pipe", variable=self.mirror, bg=BG, fg=SEEN_FG,
+                       selectcolor="#1c232b", activebackground=BG, activeforeground=TEXT_FG
+                       ).pack(side="left", padx=8)
+
+    def _io_text(self):
+        return self.texts["I/O"]
+
+    def _io_mirror(self, lines):
+        if self.mirror.get():
+            w = self.app.windows[self.target.get()]
+            for l in lines:
+                w.append(l)
+            self.app.refresh_buttons()
+
+    def toggle_sampling(self):
+        if self.sampler:
+            self.sampler = None
+            self.sample_btn.configure(text="▶ sample counters (irq / disk / net)")
+            return
+        self.sampler = iocapture.Sampler()
+        self.sample_btn.configure(text="■ stop sampling")
+        self.top.after(1000, self._sample_tick)
+
+    def _sample_tick(self):
+        if not self.sampler:
+            return
+        lines = ["== Activity per second (counter deltas; MMIO trace output follows below if running) =="]
+        lines += self.sampler.tick()
+        self._io_mirror(lines)
+        if self.mmio_on:
+            lines += ["", "== MMIO trace (newest last) =="] + self.mmio_lines[-300:]
+        self._set_text(self._io_text(), lines)
+        self.top.after(1000, self._sample_tick)
+
+    def toggle_mmio(self):
+        if self.mmio_on:
+            self.mmio_on = False
+            self.mmio_btn.configure(text="▶ MMIO trace (root)")
+            if self.helper:
+                self.status.configure(text=self._safe_call(self.helper, "mmio_stop")[0])
+            return
+        if not self.helper:
+            self.status.configure(text="elevate first (MMIO trace needs root)")
+            return
+        from tkinter import messagebox
+        if not messagebox.askyesno("Start MMIO trace?", "mmiotrace records every register read/write of "
+                                   "devices whose drivers map hardware AFTER it starts, and slows the "
+                                   "system while on. It is turned off (tracer restored to nop) when you "
+                                   "stop, drop root or quit. Start?", parent=self.top):
+            return
+        msg = self._safe_call(self.helper, "mmio_start")
+        if not msg[0].startswith("mmiotrace on"):
+            self.status.configure(text=msg[0])
+            self._set_text(self._io_text(), msg)
+            return
+        self.mmio_lines, self.ranges = [], iocapture.pci_ranges()
+        self.mmio_on = True
+        self.mmio_btn.configure(text="■ stop MMIO trace")
+        self.status.configure(text="")
+        self._set_text(self._io_text(), msg)
+        self.top.after(500, self._mmio_tick)
+
+    @staticmethod
+    def _safe_call(h, op, **kw):
+        try:
+            return h.call(op, **kw)
+        except ElevateError as e:
+            return [f"{op}: {e}"]
+
+    def _mmio_tick(self):
+        if not self.mmio_on or not self.helper:
+            return
+        h = self.helper
+
+        def poll():
+            lines = self._safe_call(h, "mmio_poll")
+            self.mmio_results.put(lines)
+        threading.Thread(target=poll, daemon=True).start()
+        self.top.after(400, self._mmio_collect)
+
+    def _mmio_collect(self):
+        try:
+            lines = self.mmio_results.get_nowait()
+        except queue.Empty:
+            if self.mmio_on:
+                self.top.after(100, self._mmio_collect)
+            return
+        if lines and lines[0].startswith("mmio_poll:"):
+            self.mmio_on = False
+            self.mmio_btn.configure(text="▶ MMIO trace (root)")
+            self.mmio_lines.append(lines[0])
+        else:
+            dec = [iocapture.decode_mmio(l, self.ranges) for l in lines]
+            self.mmio_lines += dec
+            self.mmio_lines = self.mmio_lines[-5000:]
+            self._io_mirror(dec)
+        if not self.sampler:   # sampler tick redraws when running; otherwise draw here
+            head = ["== MMIO trace (newest last) =="]
+            if not self.mmio_lines:
+                head.append("(waiting — no traced device has touched its registers yet. "
+                            "Reload a driver, e.g. `sudo modprobe -r e1000e && sudo modprobe e1000e`.)")
+            self._set_text(self._io_text(), head + self.mmio_lines[-300:])
+            self._io_text().see("end")
+        if self.mmio_on:
+            self.top.after(400, self._mmio_tick)
 
     def priv(self, op, **args):
         if not self.helper:

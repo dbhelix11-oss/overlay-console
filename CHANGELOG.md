@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-10-12 (step 4)
+- I/O tab in the Memory window. Stage A: per-second deltas of interrupt / disk / network counters (`memsurvey/iocapture.py`), optionally mirrored to a pipe window.
+- Stage B (root): mmiotrace via helper ops `mmio_start/poll/stop` (writes only tracefs `current_tracer`/`tracing_on`, always restores `nop`, refuses if another tracer is active); trace lines decoded and annotated with the owning PCI device/BAR.
+
 ## 2026-10-12 (step 3)
 - Privileged read-only helper (`memsurvey/helper.py`, launched via pkexec by `memsurvey/elevate.py`) with a fixed op whitelist over JSON lines; Elevate / Drop root button in the Memory window.
 - Elevated mode re-reads all tabs as root; new Privileged tab: /proc/kcore virtual map, vmallocinfo, kallsyms search, process memory hexdump, pagemap virtual->physical, /dev/mem hexdump.

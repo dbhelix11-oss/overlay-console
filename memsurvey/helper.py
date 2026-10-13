@@ -3,10 +3,14 @@
 
 Protocol: one JSON object per line on stdin ({"id", "op", ...args}); one JSON
 object per line on stdout ({"id", "ok", "lines"|"error"}). Only the operations in
-OPS exist, and none of them writes to memory, devices or files.
+OPS exist. None writes to memory or devices. The single exception is the
+mmio_* trio, which writes fixed strings to the kernel tracer's own control
+files (current_tracer / tracing_on) and always restores them to "nop".
 """
+import atexit
 import json
 import os
+import select
 import struct
 import sys
 
@@ -109,6 +113,93 @@ def op_pagemap(args):
     return rows
 
 
+# ------------------------------------------------------- mmiotrace (Stage B)
+_TRACEFS = ("/sys/kernel/tracing", "/sys/kernel/debug/tracing")
+_mmio = {"fd": None, "dir": None, "buf": b""}
+
+
+def _tracefs():
+    for d in _TRACEFS:
+        if os.path.exists(os.path.join(d, "current_tracer")):
+            return d
+    raise OpError("tracefs not available (is it mounted? try: mount -t tracefs nodev /sys/kernel/tracing)")
+
+
+def _tw(d, name, value):
+    try:
+        with open(os.path.join(d, name), "w") as f:
+            f.write(value)
+    except OSError as e:
+        raise OpError(f"write {name}: {e.strerror}")
+
+
+def _mmio_off():
+    d, fd = _mmio["dir"], _mmio["fd"]
+    if fd is not None:
+        os.close(fd)
+    _mmio.update(fd=None, buf=b"")
+    if d:
+        try:
+            _tw(d, "tracing_on", "0")
+            _tw(d, "current_tracer", "nop")
+        except OpError:
+            pass
+        _mmio["dir"] = None
+
+
+atexit.register(_mmio_off)
+
+
+def op_mmio_start(args):
+    d = _tracefs()
+    if _mmio["fd"] is not None:
+        raise OpError("mmiotrace already running")
+    tracers = survey.read(os.path.join(d, "available_tracers"))[0] or ""
+    if "mmiotrace" not in tracers.split():
+        raise OpError("kernel has no mmiotrace tracer")
+    cur = (survey.read(os.path.join(d, "current_tracer"))[0] or "").strip()
+    if cur not in ("nop", ""):
+        raise OpError(f"another tracer is active ({cur}); refusing to replace it")
+    _tw(d, "current_tracer", "mmiotrace")
+    _mmio["dir"] = d
+    try:
+        _tw(d, "tracing_on", "1")
+        _mmio["fd"] = os.open(os.path.join(d, "trace_pipe"), os.O_RDONLY | os.O_NONBLOCK)
+    except (OpError, OSError) as e:
+        _mmio_off()
+        raise OpError(f"could not start: {e}")
+    return ["mmiotrace on. It only sees registers of devices whose driver maps them AFTER this point "
+            "(reload a driver, or plug a device in)."]
+
+
+def op_mmio_poll(args):
+    fd = _mmio["fd"]
+    if fd is None:
+        raise OpError("mmiotrace not running")
+    for _ in range(64):
+        if not select.select([fd], [], [], 0)[0]:
+            break
+        try:
+            chunk = os.read(fd, 65536)
+        except BlockingIOError:
+            break
+        if not chunk:
+            break
+        _mmio["buf"] += chunk
+    *lines, _mmio["buf"] = _mmio["buf"].split(b"\n")
+    lines = [l.decode("utf-8", "replace") for l in lines]
+    if len(lines) > 1000:
+        lines = lines[:1000] + [f"# dropped {len(lines) - 1000} lines"]
+    return lines
+
+
+def op_mmio_stop(args):
+    if _mmio["dir"] is None:
+        raise OpError("mmiotrace not running")
+    _mmio_off()
+    return ["mmiotrace off, tracer restored to nop"]
+
+
 # x86-64 4-level layout, used only to label kcore segments
 _REGIONS = [(0xffff800000000000, 0xffff887fffffffff, "guard hole"),
             (0xffff888000000000, 0xffffc87fffffffff, "direct map of physical RAM"),
@@ -171,7 +262,8 @@ def op_kallsyms(args):
 
 OPS = {"ping": op_ping, "section": op_section, "process_detail": op_process_detail,
        "read_process": op_read_process, "read_phys": op_read_phys, "pagemap": op_pagemap,
-       "kcore_map": op_kcore_map, "vmallocinfo": op_vmallocinfo, "kallsyms": op_kallsyms}
+       "kcore_map": op_kcore_map, "mmio_start": op_mmio_start,
+       "mmio_poll": op_mmio_poll, "mmio_stop": op_mmio_stop, "vmallocinfo": op_vmallocinfo, "kallsyms": op_kallsyms}
 
 
 def handle(req):
