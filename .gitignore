@@ -1,0 +1,6 @@
+__pycache__/
+pipes/
+state.json
+state.tmp
+*.lock
+logs/
