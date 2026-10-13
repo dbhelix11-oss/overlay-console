@@ -6,6 +6,7 @@ import sys
 import tkinter as tk
 
 from occore import config
+from occore.dock import DOCK_SIZE, KEY as DOCK_KEY, DockWindow
 from occore.layout import Layout
 from occore.pipes import start_readers
 from memsurvey.window import MemoryWindow
@@ -27,7 +28,11 @@ class App:
         self.layout.track_paned("control:paned", self.control.paned, [0.65])
 
         self.windows = {}
-        for i, n in enumerate(self.names):
+        self.dock = DockWindow(self, self.names[:DOCK_SIZE])
+        self.windows.update(self.dock.panes)
+        if not self.layout.track(DOCK_KEY, self.dock.top, "1000x640+320+40"):
+            self.dock.top.withdraw()
+        for i, n in enumerate(self.names[DOCK_SIZE:]):
             w = PipeWindow(self, n)
             visible = self.layout.track(f"pipe:{n}", w.top,
                                         f"520x300+{320 + 30 * i}+{40 + 30 * i}")

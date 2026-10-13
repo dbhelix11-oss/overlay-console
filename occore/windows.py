@@ -13,12 +13,16 @@ class PipeWindow:
     """Text view of one pipe. Lines are 'new' (bright) until the window is left
     or 'mark seen' is pressed; a divider marks where the unread block begins."""
 
-    def __init__(self, app, name):
+    def __init__(self, app, name, parent=None):
         self.app = app
         self.name = name
-        self.top = tk.Toplevel(app.root)
-        self.top.title(f"OverlayConsole — {name}")
-        self.top.configure(bg=BG)
+        self.docked = parent is not None
+        if self.docked:  # a pane inside the DockWindow grid
+            self.top = tk.Frame(parent, bg=BG)
+        else:
+            self.top = tk.Toplevel(app.root)
+            self.top.title(f"OverlayConsole — {name}")
+            self.top.configure(bg=BG)
         self.unseen = 0
         self.divider = False
 
@@ -44,8 +48,9 @@ class PipeWindow:
         self.text.tag_configure("new", foreground=NEW_FG)
         self.text.tag_configure("divider", foreground=DIVIDER_FG, justify="center")
 
-        self.top.bind("<FocusOut>", self._focus_out)
-        self.top.protocol("WM_DELETE_WINDOW", self.hide)
+        if not self.docked:
+            self.top.bind("<FocusOut>", self._focus_out)
+            self.top.protocol("WM_DELETE_WINDOW", self.hide)
         self._update_status()
 
     # -- single entry point for incoming lines (the seam for a future log sink)
@@ -99,16 +104,22 @@ class PipeWindow:
         self.status.configure(text=f"pipes/{self.name}   {pending}")
 
     def show(self):
+        if self.docked:
+            return self.app.dock.show()
         self.top.deiconify()
         self.app.layout.set_visible(f"pipe:{self.name}", True)
         self.app.refresh_buttons()
 
     def hide(self):
+        if self.docked:
+            return self.app.dock.hide()
         self.top.withdraw()
         self.app.layout.set_visible(f"pipe:{self.name}", False)
         self.app.refresh_buttons()
 
     def visible(self):
+        if self.docked:
+            return self.app.dock.visible()
         return self.top.state() != "withdrawn"
 
 
