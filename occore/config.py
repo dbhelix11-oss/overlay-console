@@ -8,7 +8,7 @@ STATE_FILE = ROOT / "state.json"
 LOCK_FILE = ROOT / "overlayconsole.lock"
 CONFIG_FILE = ROOT / "config.json"
 
-DEFAULT_PIPE_NAMES = ["alpha", "bravo", "charlie", "delta", "echo"]
+DEFAULT_PIPE_NAMES = ["alpha", "bravo", "charlie", "delta", "epsilon"]
 
 
 def pipe_names():

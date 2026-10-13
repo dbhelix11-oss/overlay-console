@@ -109,11 +109,11 @@ and the proportions are kept. The divider positions are saved (as proportions) i
 <p>Because the four are one window, clicking any of their names in the control window shows or hides the whole
 grid. New text in the grid is marked as seen when the grid window loses keyboard focus (all four panes together);
 each pane still has its own <strong>mark seen</strong> and <strong>clear</strong> buttons. Any pipes beyond the
-first four (by default <code>echo</code>) stay as separate floating windows.</p>
+first four (by default <code>epsilon</code>) stay as separate floating windows.</p>
 
 <h3>Pipe windows</h3>
 <p>One view per pipe, named for the pipe (<code>alpha</code>, <code>bravo</code>, <code>charlie</code>,
-<code>delta</code>, <code>echo</code>), either a pane in the grid or a floating window. Each has:</p>
+<code>delta</code>, <code>epsilon</code>), either a pane in the grid or a floating window. Each has:</p>
 <ul>
   <li>a status line (<code>pipes/alpha &nbsp; 3 new</code> or <code>all seen</code>),</li>
   <li><strong>mark seen</strong> &ndash; turn all bright text grey (see <a href="#seen">section 5</a>),</li>
@@ -130,7 +130,7 @@ can feed a window &mdash; no special tool is required.</p>
 ping -c 5 localhost &gt; pipes/bravo
 dmesg | tee pipes/charlie            # tee also shows it in your terminal
 tail -f /var/log/syslog &gt;&gt; pipes/delta
-journalctl -f &gt; pipes/echo
+journalctl -f &gt; pipes/epsilon
 cat notes.txt &gt; pipes/alpha</code></pre>
 <p>Use the full path (or run from the project folder as above). Each line you write becomes one line in the
 window; text is decoded as UTF-8 and unprintable bytes are replaced.</p>
@@ -160,6 +160,27 @@ rather than duplicating it. A script cannot change the shell that launched it, s
 Note that <code>cmd &gt; pipe 2&gt;&amp;1</code> sends errors too, while <code>cmd 2&gt;&amp;1 &gt; pipe</code> does not
 (the order matters). Remote options need your own SSH access; the script never reads <code>~/.ssh</code>, and a
 <code>socat</code> listener has no authentication, so keep it bound to <code>127.0.0.1</code>.</p>
+
+<h3>Showing output from a remote machine</h3>
+<p>Nothing needs to be installed on the remote machine beyond its SSH (Secure Shell) server, which it almost
+certainly runs already. The simplest method is to <strong>pull</strong>: run the command on the remote machine
+over SSH from here, and redirect what comes back into a local pipe.</p>
+<pre><code>ssh user@remote 'journalctl -f 2&gt;&amp;1'    &gt; ~/oc/alpha
+ssh user@remote 'make -C /srv/app 2&gt;&amp;1'   &gt; ~/oc/charlie
+ssh user@remote 'dmesg -w' | tee ~/oc/delta</code></pre>
+<p>The remote command's output travels back over the SSH connection and the local redirect writes it into the
+pipe. Put <code>2&gt;&amp;1</code> inside the quotes so it applies on the remote machine. If SSH logins to that host
+already work from here, this works too; the remote machine needs no access back to this one.</p>
+<ul>
+  <li>If output arrives late or in bursts, run the remote command under <code>stdbuf -oL</code> (part of
+      coreutils, normally already present): <code>ssh user@remote 'stdbuf -oL cmd'</code>.</li>
+  <li>For long-running streams add <code>-o ServerAliveInterval=30</code> so a dropped connection is noticed.</li>
+  <li>If the connection drops, the window stays open; just run the command again.</li>
+</ul>
+<p>The opposite direction, <strong>pushing</strong> from the remote machine (setup-access options 5 and 6), needs
+that machine to be able to reach this one over SSH or through a <code>socat</code> listener here. Even then the
+remote side needs only bash: <code>some_cmd &gt; /dev/tcp/127.0.0.1/9001</code> through an SSH reverse tunnel
+(<code>ssh -R</code>). Prefer the pull method unless the remote machine must start the connection.</p>
 
 <h2 id="seen">5. Seen vs. new text</h2>
 <p>New text is drawn in <span class="new">bright green</span>. Text you have already seen is

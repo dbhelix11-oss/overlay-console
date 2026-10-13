@@ -15,7 +15,7 @@ MARK_END="# <<< overlayconsole <<<"
 # pipe names come from config.json when valid, else the defaults
 NAMES=$(python3 -I - "$PROJECT/config.json" <<'PY' 2>/dev/null
 import json, sys
-d = ["alpha", "bravo", "charlie", "delta", "echo"]
+d = ["alpha", "bravo", "charlie", "delta", "epsilon"]
 try:
     n = json.load(open(sys.argv[1])).get("pipes")
     if isinstance(n, list) and n and all(isinstance(x, str) and x.isidentifier() for x in n):
@@ -25,7 +25,7 @@ except Exception:
 print(" ".join(d))
 PY
 )
-[ -n "$NAMES" ] || NAMES="alpha bravo charlie delta echo"
+[ -n "$NAMES" ] || NAMES="alpha bravo charlie delta epsilon"
 FIRST=${NAMES%% *}
 
 # shell builtins/keywords must not be shadowed by a function
