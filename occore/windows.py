@@ -149,6 +149,10 @@ class ControlWindow:
                                     bg="#1c232b", fg="#ccc", activebackground="#2a3440",
                                     command=lambda: app.toggle_memory())
         self.mem_button.pack(fill="x", padx=6, pady=(8, 1))
+        if app.tray.available:
+            tk.Button(top, text="Hide to tray", anchor="w", relief="flat", bg="#1c232b",
+                      fg="#ccc", activebackground="#2a3440",
+                      command=app.hide_to_tray).pack(fill="x", padx=6, pady=(8, 1))
         self.paned.add(top, minsize=80)
 
         info = tk.Text(self.paned, bg=BG, fg=SEEN_FG, borderwidth=0, highlightthickness=0,

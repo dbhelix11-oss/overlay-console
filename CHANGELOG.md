@@ -1,6 +1,7 @@
 # Changelog
 
 ## 2026-10-13
+- One taskbar entry: all windows are transient children of the control window (skip taskbar/pager). Optional system-tray icon (`occore/tray.py`, pystray): minimize or "Hide to tray" hides everything, click the icon to restore, menu has Show/hide and Quit.
 - Windows now remember their virtual desktop (X11, via xprop/xwininfo/wmctrl; skipped if unavailable) and are moved back to it on start.
 - Renamed the default fifth pipe `echo` -> `epsilon` (avoids clashing with the shell builtin). User guide: added remote-output (SSH pull) section.
 - User guide: documented the docked grid and `setup-access.sh`. Commits now use the GitHub noreply address.

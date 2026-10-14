@@ -7,8 +7,9 @@ import tkinter as tk
 
 from occore import config
 from occore.dock import DOCK_SIZE, KEY as DOCK_KEY, DockWindow
-from occore.layout import Layout
+from occore.layout import Layout, on_current_desktop
 from occore.pipes import start_readers
+from occore.tray import Tray
 from memsurvey.window import MemoryWindow
 from occore.windows import ControlWindow, PipeWindow
 
@@ -23,6 +24,7 @@ class App:
         self.layout = Layout(config.STATE_FILE, self.root)
         self.queue, self.readers = start_readers(self.names, self.pipe_dir)
 
+        self.tray = Tray()
         self.control = ControlWindow(self)
         self.layout.track("control", self.root, "260x320+40+40")
         self.layout.track_paned("control:paned", self.control.paned, [0.65])
@@ -45,6 +47,12 @@ class App:
                                  default_visible=False):
             self.memory.top.withdraw()
 
+        # one taskbar entry: every other window is a transient child of the control window
+        for top in (self.dock.top, self.memory.top,
+                    *(w.top for w in self.windows.values() if not w.docked)):
+            top.transient(self.root)
+        if self.tray.available:
+            self.root.bind("<Unmap>", self._on_unmap)  # minimizing sends everything to the tray
         self.root.protocol("WM_DELETE_WINDOW", self.quit)
         self.refresh_buttons()
         self.root.after(POLL_MS, self.poll)
@@ -57,11 +65,43 @@ class App:
     def toggle_memory(self):
         self.memory.hide() if self.memory.visible() else self.memory.show()
 
+    def _on_unmap(self, ev):
+        if ev.widget is self.root and self.root.state() == "iconic":
+            self.root.after(150, self._maybe_tray)
+
+    def _maybe_tray(self):
+        # only a real minimize counts; a window on another desktop is unmapped too
+        if self.root.state() == "iconic" and on_current_desktop(self.root):
+            self.hide_to_tray()
+
+    def hide_to_tray(self):
+        if self.tray.available:
+            self.root.withdraw()  # transient children go with it
+
+    def show_from_tray(self):
+        self.root.deiconify()
+        self.root.lift()
+        self.root.after(200, self.layout.restore_desktops)
+
+    def toggle_tray(self):
+        if self.root.state() == "normal":
+            self.hide_to_tray()
+        else:
+            self.show_from_tray()
+
     def refresh_buttons(self):
         self.control.refresh(self.windows, self.memory)
 
     def poll(self):
         changed = False
+        try:
+            while True:
+                ev = self.tray.events.get_nowait()
+                self.toggle_tray() if ev == "toggle" else self.quit()
+                if ev == "quit":
+                    return
+        except queue.Empty:
+            pass
         try:
             while True:
                 name, line = self.queue.get_nowait()
@@ -74,6 +114,7 @@ class App:
         self.root.after(POLL_MS, self.poll)
 
     def quit(self):
+        self.tray.stop()
         if self.memory.helper:
             self.memory.helper.close()
         for r in self.readers:

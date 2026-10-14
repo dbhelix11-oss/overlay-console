@@ -100,6 +100,16 @@ is hidden. When a hidden or background window has unread text, its name turns gr
 <p><strong>Closing the control window quits the program</strong> and closes the other windows. Closing a pipe
 window or the Memory window only hides it.</p>
 
+<h3>One taskbar entry and the system tray</h3>
+<p>The control window is the only OverlayConsole entry on the taskbar. Every other window (the grid, floating
+pipe windows, Memory survey) is a child of it: hidden from the taskbar and pager, and minimized and restored
+together with it.</p>
+<p>If the optional tray library is installed (<code>sudo apt install python3-pystray</code>), a small
+terminal-style icon appears in the system tray. <strong>Minimizing the control window</strong>, or pressing
+<strong>Hide to tray</strong>, hides all windows; <strong>click the tray icon</strong> (or choose
+<em>Show / hide</em> in its menu) to bring them back exactly as they were. The tray menu's <em>Quit</em> closes the
+program. Without the library nothing changes except the single taskbar entry; minimizing then works normally.</p>
+
 <h3>The docked grid (first four pipes)</h3>
 <p>The first four pipes (<code>alpha</code>, <code>bravo</code> on top; <code>charlie</code>,
 <code>delta</code> below) are snapped together in <strong>one window</strong> as a 2&times;2 grid. Drag the

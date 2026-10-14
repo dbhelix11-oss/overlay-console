@@ -48,6 +48,33 @@ def get_desktop(win):
     return int(m[1]) if m else None
 
 
+def skip_taskbar(win):
+    """Keep a secondary window off the taskbar/pager (X11, needs wmctrl)."""
+    if not shutil.which("wmctrl"):
+        return
+    try:
+        subprocess.run(["wmctrl", "-i", "-r", _client_id(win), "-b", "add,skip_taskbar,skip_pager"],
+                       capture_output=True, timeout=2)
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
+def on_current_desktop(win):
+    """True if the window lives on the desktop being shown (or on all of them, or unknown).
+    A window on another desktop is unmapped by the window manager just like a minimized
+    one, so callers use this to tell the two apart."""
+    d = get_desktop(win)
+    if d is None or d == STICKY or not shutil.which("xprop"):
+        return True
+    try:
+        out = subprocess.run(["xprop", "-root", "_NET_CURRENT_DESKTOP"], capture_output=True,
+                             text=True, timeout=2).stdout
+    except (OSError, subprocess.SubprocessError):
+        return True
+    m = _DESKTOP.search(out)
+    return m is None or int(m[1]) == d
+
+
 def set_desktop(win, desktop):
     """Ask the window manager to move a mapped window to a virtual desktop (X11, needs wmctrl)."""
     if not shutil.which("wmctrl"):
@@ -116,8 +143,12 @@ class Layout:
 
     # -- virtual desktop memory (X11 only; silently does nothing elsewhere)
     def _restore_one(self, key, win):
+        if not _shown(win):
+            return
+        if key != "control":  # the control window is the one taskbar entry
+            skip_taskbar(win)
         d = self.entry(key).get("desktop")
-        if isinstance(d, int) and _shown(win):
+        if isinstance(d, int):
             set_desktop(win, d)
 
     def restore_desktops(self):
