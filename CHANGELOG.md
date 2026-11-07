@@ -1,5 +1,8 @@
 # Changelog
 
+## 2026-11-06
+- Docked grid: dragging the centre crossing of the row and column dividers now resizes all four panes at once (`occore/dock.py`); cursor becomes a four-way arrow there; position saved in `state.json`.
+
 ## 2026-10-13
 - One taskbar entry: all windows are transient children of the control window (skip taskbar/pager). Optional system-tray icon (`occore/tray.py`, pystray): minimize or "Hide to tray" hides everything, click the icon to restore, menu has Show/hide and Quit.
 - Windows now remember their virtual desktop (X11, via xprop/xwininfo/wmctrl; skipped if unavailable) and are moved back to it on start.
